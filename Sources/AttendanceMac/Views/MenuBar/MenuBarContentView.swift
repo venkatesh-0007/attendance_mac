@@ -151,33 +151,20 @@ public struct MenuBarContentView: View {
                 
                 Spacer()
                 
-                VStack(alignment: .trailing, spacing: 3) {
-                    // Status Pill with Glowing Dot
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(isSafe ? AttendanceColors.safe : AttendanceColors.critical)
-                            .frame(width: 6, height: 6)
-                            .shadow(color: (isSafe ? AttendanceColors.safe : AttendanceColors.critical).opacity(0.6), radius: 2)
-                        
-                        Text(isSafe ? "Safe Standing" : "At Risk")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(isSafe ? AttendanceColors.safe : AttendanceColors.critical)
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
+                // Numbers only: attended / held (No "Classes Held", no "Safe Standing")
+                Text("\(attendance.attendedCount)/\(attendance.heldCount)")
+                    .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3.5)
                     .background(
                         Capsule()
-                            .fill((isSafe ? AttendanceColors.safe : AttendanceColors.critical).opacity(0.12))
+                            .fill(Color.white.opacity(0.06))
                     )
                     .overlay(
                         Capsule()
-                            .stroke((isSafe ? AttendanceColors.safe : AttendanceColors.critical).opacity(0.3), lineWidth: 0.5)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
                     )
-                    
-                    Text("\(attendance.attendedCount)/\(attendance.heldCount) Classes Held")
-                        .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
             }
             
             // Liquid Progress Track with Target Goal Marker
@@ -238,9 +225,9 @@ public struct MenuBarContentView: View {
         HStack(spacing: 9) {
             ZStack {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(color.opacity(0.15))
+                    .fill(color.opacity(0.16))
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(color.opacity(0.3), lineWidth: 0.5)
+                    .stroke(color.opacity(0.32), lineWidth: 0.5)
                 
                 Image(systemName: isSafe ? "shield.fill" : "exclamationmark.triangle.fill")
                     .font(.system(size: 13, weight: .bold))
@@ -249,26 +236,30 @@ public struct MenuBarContentView: View {
             }
             .frame(width: 28, height: 28)
             
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(isSafe ? "Safe to Skip:" : "Must Attend:")
-                        .font(.system(size: 10.5, weight: .semibold))
-                        .foregroundColor(.secondary)
-                    
-                    Text(isSafe ? "\(advice.periodsCanSkip) Periods" : "\(advice.periodsNeedToAttend) Periods")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundColor(color)
-                }
-                
-                Text(isSafe ? "Buffer above \(Int(viewModel.targetThreshold))% target goal" : "Attend next \(advice.periodsNeedToAttend) classes to reach \(Int(viewModel.targetThreshold))%")
-                    .font(.system(size: 9.5))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
+            Text(isSafe ? "Safe to Skip:" : "Must Attend:")
+                .font(.system(size: 11.5, weight: .bold))
+                .foregroundColor(.primary)
             
             Spacer()
+            
+            // Prominently highlighted period count (removed "Buffer above 75% target goal" subtitle)
+            Text(isSafe ? "\(advice.periodsCanSkip) Periods" : "\(advice.periodsNeedToAttend) Periods")
+                .font(.system(size: 13, weight: .black, design: .rounded))
+                .foregroundColor(color)
+                .shadow(color: color.opacity(0.35), radius: 3, x: 0, y: 1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3.5)
+                .background(
+                    Capsule()
+                        .fill(color.opacity(0.15))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(color.opacity(0.35), lineWidth: 0.75)
+                )
         }
-        .padding(8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .fill(.ultraThinMaterial)
@@ -293,18 +284,39 @@ public struct MenuBarContentView: View {
     
     // MARK: - 3. TODAY'S ATTENDANCE FROM ATTENDANCE GRID (Liquid Glass Tile)
     
+    private func getTodayCounts(grid: GridDayAttendance?, timeline: [AttendanceStatus], records: [TodayGridSubjectRecord], summary: (present: Int, absent: Int, pending: Int, total: Int)) -> (present: Int, absent: Int) {
+        if let g = grid, !g.timeline.isEmpty {
+            return (g.presentCount, g.absentCount)
+        } else if !timeline.isEmpty {
+            let p = timeline.filter { $0 == .present }.count
+            let a = timeline.filter { $0 == .absent }.count
+            return (p, a)
+        } else {
+            let p = records.reduce(0) { sum, rec in
+                sum + rec.statusString.uppercased().filter { $0 == "P" }.count
+            }
+            let a = records.reduce(0) { sum, rec in
+                sum + rec.statusString.uppercased().filter { $0 == "A" }.count
+            }
+            return (p, a)
+        }
+    }
+    
     @ViewBuilder
     private func todayAttendanceGridGlassCard(_ attendance: AttendanceResponse) -> some View {
         let grid = viewModel.todayGridAttendance
         let records = grid?.records ?? []
         let timeline = grid?.timeline ?? viewModel.todayTimeline
         let summary = attendance.getTodaySummary()
+        let counts = getTodayCounts(grid: grid, timeline: timeline, records: records, summary: summary)
+        let presentCount = counts.present
+        let absentCount = counts.absent
         
         VStack(alignment: .leading, spacing: 6) {
             // Header
             HStack {
                 HStack(spacing: 4) {
-                    Text("TODAY'S GRID")
+                    Text("TODAY'S ATTENDANCE")
                         .font(.system(size: 9.5, weight: .black, design: .rounded))
                         .foregroundColor(.secondary)
                     
@@ -315,16 +327,18 @@ public struct MenuBarContentView: View {
                 
                 Spacer()
                 
-                if !records.isEmpty {
-                    let presentCount = records.filter { $0.status == .present || $0.statusString.uppercased().contains("P") }.count
-                    let absentCount = records.filter { $0.status == .absent || $0.statusString.uppercased().contains("A") }.count
-                    Text("\(presentCount)P • \(absentCount)A")
-                        .font(.system(size: 9.5, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
-                } else if !timeline.isEmpty && (summary.present > 0 || summary.absent > 0) {
-                    Text("\(summary.present)P • \(summary.absent)A")
-                        .font(.system(size: 9.5, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
+                if presentCount > 0 || absentCount > 0 {
+                    HStack(spacing: 3) {
+                        Text("\(presentCount)P")
+                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                            .foregroundColor(presentCount > 0 ? AttendanceColors.safe : .secondary)
+                        Text("•")
+                            .font(.system(size: 8.5))
+                            .foregroundColor(.secondary.opacity(0.5))
+                        Text("\(absentCount)A")
+                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                            .foregroundColor(absentCount > 0 ? AttendanceColors.critical : .secondary)
+                    }
                 }
             }
             
