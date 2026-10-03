@@ -1,0 +1,23 @@
+# macOS System Files
+.DS_Store
+*/.DS_Store
+*/*/.DS_Store
+*/*/*/.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode and Build Artifacts
+build/
+DerivedData/
+.build/
+.cache/
+test_pbx.plist
+
+# User-specific Xcode files
+xcuserdata/
+*.xcuserdatad
+*.xcuserstate
+
+# Swift Package Manager
+.swiftpm/
+
